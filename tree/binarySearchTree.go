@@ -6,8 +6,7 @@ import (
 )
 
 var (
-	BSTFATAL    = errors.New("Binary search tree operation failed")
-	BSTNOTFOUND = errors.New("Element not found in the tree")
+	BSTNOTFOUND = errors.New("BST: Element not found")
 )
 
 type bstNode struct {
@@ -16,15 +15,13 @@ type bstNode struct {
 }
 
 type BinarySeachTree struct {
-	Root        *bstNode                    // counts the nodes
-	CompareFunc func(a, b interface{}) bool // returns true if the value of a is greater than or equal to b
-	EqualFunc   func(a, b interface{}) bool //true if value matches
+	root        *bstNode                   // counts the nodes
+	compareFunc func(a, b interface{}) int // returns true if the value of a is greater than or equal to b
 }
 
-func GetBinarySeachTree(compare, equal func(a, b interface{}) bool) BinarySeachTree {
+func NewBinarySeachTree(compare func(a, b interface{}) int) BinarySeachTree {
 	tree := BinarySeachTree{}
-	tree.CompareFunc = compare
-	tree.EqualFunc = equal
+	tree.compareFunc = compare
 	return tree
 }
 
@@ -37,21 +34,21 @@ func newBstNode(data interface{}) *bstNode {
 }
 
 func (this *BinarySeachTree) Insert(data interface{}) {
-	if this.Root == nil {
-		this.Root = newBstNode(data)
+	if this.root == nil {
+		this.root = newBstNode(data)
 	} else {
-		root := this.Root
+		root := this.root
 		var previous *bstNode
 		previous = nil
 		for root != nil {
 			previous = root
-			if this.CompareFunc(root.data, data) {
+			if this.compareFunc(root.data, data) == 1 {
 				root = root.left
 			} else {
 				root = root.right
 			}
 		}
-		if this.CompareFunc(previous.data, data) {
+		if this.compareFunc(previous.data, data) == 1 {
 			previous.left = newBstNode(data)
 		} else {
 			previous.right = newBstNode(data)
@@ -61,14 +58,14 @@ func (this *BinarySeachTree) Insert(data interface{}) {
 
 func (this *BinarySeachTree) Delete(data interface{}) bool {
 	parentleft := false //if the node to be deleted is the left child of the parent
-	node := this.Root
+	node := this.root
 	var parent *bstNode
 	for node != nil {
-		if this.EqualFunc(data, node.data) {
+		if this.compareFunc(data, node.data) == 0 {
 			break
 		}
 		parent = node
-		if this.CompareFunc(node.data, data) {
+		if this.compareFunc(node.data, data) == 1 {
 			node = node.left
 			parentleft = true
 		} else {
@@ -81,7 +78,7 @@ func (this *BinarySeachTree) Delete(data interface{}) bool {
 		return false
 	}
 	isRoot := false
-	if node == this.Root {
+	if node == this.root {
 		isRoot = true
 	}
 	var finalNode *bstNode //final node to be updated in the parent
@@ -92,8 +89,9 @@ func (this *BinarySeachTree) Delete(data interface{}) bool {
 	} else if node.right == nil {
 		finalNode = node.left
 	} else {
-		pred := this.modifyPredecessor(node)
+		pred, parent := this.predecessor(node)
 		if pred != node.left {
+			parent.right = pred.left
 			pred.left = node.left
 			pred.right = node.right
 		} else {
@@ -102,7 +100,7 @@ func (this *BinarySeachTree) Delete(data interface{}) bool {
 		finalNode = pred
 	}
 	if isRoot {
-		this.Root = finalNode
+		this.root = finalNode
 	} else if parentleft {
 		parent.left = finalNode
 	} else {
@@ -112,64 +110,42 @@ func (this *BinarySeachTree) Delete(data interface{}) bool {
 }
 
 //Finds the right most node and updates the parent node of the right most node(predecessor)
-func (this *BinarySeachTree) modifyPredecessor(root *bstNode) *bstNode {
+func (this *BinarySeachTree) predecessor(root *bstNode) (node, parent *bstNode) {
 	if root.left == nil {
-		return nil
+		node = nil
+		return
 	}
-	node := root.left
+	parent = root
+	node = root.left
 	if node.right == nil {
-		return node
+		return
 	}
-	var parent *bstNode
-	for node.right != nil {
+	for node.right != nil && node != root {
 		parent = node
 		node = node.right
 	}
-	parent.right = node.left
-	node.left = nil
-	return node
-}
-
-//returns predecessor where the root is not equal to the  root
-func (this *BinarySeachTree) predecessor(root *bstNode) *bstNode {
-	if root.left == nil {
-		return nil
-	}
-	node := root.left
-	for node != root && node.right != nil {
-		node = node.right
-	}
-	return node
-}
-
-//returns predecessor where the node right is not equal to the root
-func (this *BinarySeachTree) predecessorNonRight(root *bstNode) *bstNode {
-	if root.left == nil {
-		return nil
-	}
-	node := root.left
-	for node.right != root && node.right != nil {
-		node = node.right
-	}
-	return node
+	/*
+		parent.right = node.left
+		node.left = nil*/
+	return
 }
 
 //Morris inorder traversal
 //non-recursice and non-stack based inorder traversal of the tree
 func (this *BinarySeachTree) Inorder() []interface{} {
 	data := containers.NewStack()
-	node := this.Root
+	node := this.root
 	for node != nil {
 		if node.left == nil {
 			data.Push(node.data)
 			node = node.right
 		} else {
-			pred := this.predecessor(node)
+			pred, parent := this.predecessor(node)
 			if pred != node {
 				pred.right = node
 				node = node.left
 			} else {
-				this.predecessorNonRight(node).right = nil
+				parent.right = nil
 				data.Push(node.data)
 				node = node.right
 			}
@@ -180,80 +156,63 @@ func (this *BinarySeachTree) Inorder() []interface{} {
 
 //non-recursive pre-order traversal
 func (this *BinarySeachTree) Preorder() []interface{} {
-	if this.Root == nil {
+	if this.root == nil {
 		return nil
 	}
-	var (
-		list  []interface{}
-		stack []*bstNode
-		node  *bstNode
-	)
-	index := 0
-	stack = append(stack, this.Root)
-	index++
-	for index > 0 {
-		node = stack[index-1]
-		stack = stack[:index-1]
-		index--
-		list = append(list, node.data)
+	data := containers.NewStack()
+	stack := containers.NewStack()
+	stack.Push(this.root)
+	for !stack.Empty() {
+		node := stack.Pop().(*bstNode)
+		data.Push(node.data)
 		if node.right != nil {
-			stack = append(stack, node.right)
-			index++
+			stack.Push(node.right)
 		}
 		if node.left != nil {
-			stack = append(stack, node.left)
-			index++
+			stack.Push(node.left)
 		}
 	}
-	return list
+	return data.Data()
 }
 
 //non-recursive post-order traversal using stack
 func (this *BinarySeachTree) Postorder() []interface{} {
-	var (
-		list  []interface{}
-		stack []*bstNode
-		node  *bstNode
-	)
-	if this.Root == nil {
+	if this.root == nil {
 		return nil
 	}
-	index := 0
-	node = this.Root
-	for node != nil || index > 0 {
+	data := containers.NewStack()
+	stack := containers.NewStack()
+	node := this.root
+	for node != nil || !stack.Empty() {
 		if node != nil {
 			if node.right != nil {
-				stack = append(stack, node.right)
-				index++
+				stack.Push(node.right)
 			}
-			stack = append(stack, node)
-			index++
+			stack.Push(node)
 			node = node.left
 		} else {
-			temp := stack[index-1]
-			stack = stack[:index-1]
-			index--
+			temp := stack.Pop().(*bstNode)
 			if temp.right == nil {
-				list = append(list, temp.data)
+				data.Push(temp.data)
 			} else {
-				if index > 0 && stack[index-1] == temp.right {
-					node = stack[index-1]
-					stack[index-1] = temp
+				if !stack.Empty() && stack.Peek() == temp.right {
+					node = stack.Pop().(*bstNode)
+					stack.Push(temp)
 				} else {
-					list = append(list, temp.data)
+					data.Push(temp.data)
 				}
 			}
 		}
 	}
-	return list
+	return data.Data()
 }
 
 func (this *BinarySeachTree) Search(data interface{}) (interface{}, error) {
-	root := this.Root
+	root := this.root
 	for root != nil {
-		if this.EqualFunc(data, root.data) {
+		if this.compareFunc(data, root.data) == 0 {
 			return root.data, nil
-		} else if this.CompareFunc(root.data, data) {
+		} else if this.compareFunc(root.data, data) == 1 {
 			root = root.left
 		} else {
 			root = root.right
