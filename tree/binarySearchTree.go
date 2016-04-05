@@ -2,7 +2,7 @@ package tree
 
 import (
 	"errors"
-	"github.com/JRonak/containers"
+	"github.com/JRonak/go-algo/stack"
 )
 
 var (
@@ -133,7 +133,7 @@ func (this *BinarySeachTree) predecessor(root *bstNode) (node, parent *bstNode) 
 //Morris inorder traversal
 //non-recursice and non-stack based inorder traversal of the tree
 func (this *BinarySeachTree) Inorder() []interface{} {
-	data := containers.NewStack()
+	data := stack.NewStack()
 	node := this.root
 	for node != nil {
 		if node.left == nil {
@@ -159,8 +159,8 @@ func (this *BinarySeachTree) Preorder() []interface{} {
 	if this.root == nil {
 		return nil
 	}
-	data := containers.NewStack()
-	stack := containers.NewStack()
+	data := stack.NewStack()
+	stack := stack.NewStack()
 	stack.Push(this.root)
 	for !stack.Empty() {
 		node := stack.Pop().(*bstNode)
@@ -180,8 +180,8 @@ func (this *BinarySeachTree) Postorder() []interface{} {
 	if this.root == nil {
 		return nil
 	}
-	data := containers.NewStack()
-	stack := containers.NewStack()
+	data := stack.NewStack()
+	stack := stack.NewStack()
 	node := this.root
 	for node != nil || !stack.Empty() {
 		if node != nil {
